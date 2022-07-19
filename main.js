@@ -1,119 +1,82 @@
-//Servidores
-
 const express = require("express");
 const app = express();
 const PORT = 8080;
+const frase = "hola como estan?";
 let productos = [];
-let r;
-app.get("/productos", (req, res) => {
-    res.send(`Los productos disponibles son los siguientes ${productos}`);
+
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }));
+
+
+app.get("/api/productos", (req,res)=>{
+    if(productos.length === 0){
+        res.json({
+            error: "No hay productos"
+        })
+    }
+    res.json(productos)
 })
 
-app.get("/productosRandom", (req, res) => {
-    res.send(`Un producto disponible es el siguiente ${productos[Math.floor((Math.random() * productos.length))]}`);
+app.get("/api/productos/:id", (req, res) => {
+    const id = req.params.id
+    let enc = productos.find(item=>item.id == id)
+    if (enc){
+        res.json(enc)}
+    else{
+        res.json({error: "no se encontró el producto"})
+    }    
 });
+
+  app.post("/api/productos", (req,res)=>{
+    let producto = req.body;
+    if (Object.entries(producto).length === 0 || Object.entries(producto).length < 3){
+        res.status(422).json({ error: 'No se pudo obtener los atributos del producto correctamente.'});
+    }else{
+        const ids = productos.map(item => item.id);
+        console.log(ids)
+        if(ids.length === 0){
+            producto.id = 1;
+        }else{
+            let maxId = Math.max(...ids);
+            producto.id = maxId + 1;
+        }
+        productos.push(producto);
+        res.status(201).json({ productoAgregado: producto });
+    }
+})
+
+app.put("/api/productos/:id", (req,res)=>{
+    const id = req.params.id
+    if (productos.length === 0){
+        res.json({ error: 'No se encontraron productos.'});
+    }else{
+        if (productos.length >= id){
+            const index = productos.findIndex(producto => producto.id == id);
+            productos = productos.filter(producto => producto.id != id);
+            let newProduct = req.body;
+            newProduct.id = parseInt(id);
+            productos.splice(index, 1, newProduct);
+            res.json({ productoActualizado: newProduct });
+        }else{
+            res.json({ error: 'Producto no encontrado' });
+        }
+    }
+})
+
+app.delete("/api/productos/:id", (req,res)=>{
+    const id = req.params.id;
+        if (productos.length === 0){
+            res.json({ error: 'No se encontraron productos.'});
+        }else{
+            if (productos.length >= id){
+                productos = productos.filter(producto => producto.id != id);
+                res.json({ productosRestantes: productos });
+            }else{
+                res.json({ error: 'Producto no encontrado', productosRestantes: productos });
+            }
+        }
+})
+
+
 const server = app.listen(PORT, () => {console.log(`Servidor http escuchando en el puerto ${PORT}`);});
 server.on("error", (error) => console.log(`Error en servidor ${error}`));
-
-const fs = require ('fs');
-let id = 1;
-let arrayObj = [];
-
-class Contenedor {
-    constructor(archivo){
-        this.archivo = archivo
-    }
-
-    async save(Object){
-        try {
-            if (await this.getAll() === false){
-                Object.id = id;
-                arrayObj.push(Object)
-                await fs.promises.writeFile(this.archivo,JSON.stringify(arrayObj,null,2))
-                console.log('Producto Cargado')
-            }else{
-                const datas = await this.getAll()
-                console.log(datas)
-                if(datas.length === 0){
-                    Object.id = id;
-                    
-                }
-                else{
-                    let ultElement = datas[datas.length - 1]
-                    if(ultElement.id >= 1){
-                        Object.id = ultElement.id + 1
-                    }else{
-                        Object.id = 1
-                    }
-                }
-                datas.push(Object)
-                await fs.promises.writeFile(this.archivo,JSON.stringify(datas,null,2))
-                console.log('Producto Cargado')
-            }
-
-        } catch (error) {
-            console.log('No se pudo cargar')
-        }
-    } 
-
-    async getById(number){
-        try {
-            const data = JSON.parse(await fs.promises.readFile(this.archivo, 'utf-8'))
-            const objId = data.find(item => item.id === number)
-            if(objId){
-                console.log(objId)
-            }else{
-                console.log(null)
-            }
-            return objId
-        } catch (error) {
-            
-        }
-    }
-    async getAll(){
-        try {
-           const data = JSON.parse(await fs.promises.readFile(this.archivo, 'utf-8')) 
-           for (let index = 0; index < data.length; index++) {
-            productos.push(data[index].title)
-           }
-           return data
-        } catch (error) {
-            console.log(error)
-            return false  
-        }
-    }
-
-    async deleteById(number){
-        try {
-            const deleteID = await this.getById(number)
-            const data = await this.getAll()
-            const nuevoArray = data.filter(item => item.id != deleteID.id)
-            await fs.promises.writeFile(this.archivo,JSON.stringify(nuevoArray,null,2))
-            console.log('producto eliminado')
-        } catch (error) {
-            
-        }
-    }
-
-    async deleteAll(){
-        try {
-            const data = await this.getAll();
-            data.splice(0,data.length)
-            await fs.promises.writeFile(this.archivo,JSON.stringify(data,null,2))
-        } catch (error) {
-            
-        }
-    }
-}
-
-const contenedor = new Contenedor('./productos.txt');
-const producto = {
-    title: 'Producto 1',
-    price: 200,
-    thumbnail: 'producto1.jpg'
-}
-/*
-contenedor.deleteById(5)
-contenedor.deleteAll() */
-/* contenedor.save(producto)  */
-contenedor.getAll()
